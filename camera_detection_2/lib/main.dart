@@ -1,4 +1,3 @@
-
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
@@ -6,11 +5,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
+import 'package:permission_handler/permission_handler.dart'; // Yeni eklenen import
 
 late List<CameraDescription> cameras;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Kamera izni kontrolü
+  var status = await Permission.camera.status;
+  if (!status.isGranted) {
+    await Permission.camera.request();
+  }
+
   cameras = await availableCameras();
   runApp(MyApp());
 }
@@ -62,9 +69,8 @@ class _MyHomePageState extends State<MyHomePage> {
         return;
       }
       controller.startImageStream((image) => {
-            if (!isBusy)
-              {isBusy = true, img = image, doObjectDetectionOnFrame()}
-          });
+        if (!isBusy) {isBusy = true, img = image, doObjectDetectionOnFrame()}
+      });
     });
   }
 
@@ -80,14 +86,23 @@ class _MyHomePageState extends State<MyHomePage> {
   dynamic _scanResults;
   CameraImage? img;
   doObjectDetectionOnFrame() async {
-    // var frameImg = getInputImage();
-    // List<DetectedObject> objects = await objectDetector.processImage(frameImg);
-    // print("len= ${objects.length}");
+    var frameImg = getInputImage();
+    List<DetectedObject> objects =
+    await objectDetector.processImage(frameImg);
+
+    for (DetectedObject detectedObject in objects) {
+      final rect = detectedObject.boundingBox;
+      final trackingId = detectedObject.trackingId;
+
+      for (Label label in detectedObject.labels) {
+        print('${label.text} ${label.confidence}');
+      }
+    }
+    print("len= ${objects.length}");
     setState(() {
-    //  _scanResults = objects;
+      _scanResults = objects;
       isBusy = false;
     });
-
   }
 
   InputImage getInputImage() {
@@ -96,18 +111,19 @@ class _MyHomePageState extends State<MyHomePage> {
       allBytes.putUint8List(plane.bytes);
     }
     final bytes = allBytes.done().buffer.asUint8List();
-    final Size imageSize = Size(img!.width.toDouble(), img!.height.toDouble());
+    final Size imageSize =
+    Size(img!.width.toDouble(), img!.height.toDouble());
     final camera = cameras[0];
     final imageRotation =
-        InputImageRotationValue.fromRawValue(camera.sensorOrientation);
+    InputImageRotationValue.fromRawValue(camera.sensorOrientation);
     // if (imageRotation == null) return;
 
     final inputImageFormat =
-        InputImageFormatValue.fromRawValue(img!.format.raw);
+    InputImageFormatValue.fromRawValue(img!.format.raw);
     // if (inputImageFormat == null) return null;
 
     final planeData = img!.planes.map(
-      (Plane plane) {
+          (Plane plane) {
         return InputImagePlaneMetadata(
           bytesPerRow: plane.bytesPerRow,
           height: plane.height,
@@ -123,8 +139,8 @@ class _MyHomePageState extends State<MyHomePage> {
       planeData: planeData,
     );
 
-    final inputImage =
-        InputImage.fromBytes(bytes: bytes, inputImageData: inputImageData);
+    final inputImage = InputImage.fromBytes(
+        bytes: bytes, inputImageData: inputImageData);
 
     return inputImage;
   }
@@ -161,22 +177,22 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Container(
             child: (controller.value.isInitialized)
                 ? AspectRatio(
-                    aspectRatio: controller.value.aspectRatio,
-                    child: CameraPreview(controller),
-                  )
+              aspectRatio: controller.value.aspectRatio,
+              child: CameraPreview(controller),
+            )
                 : Container(),
           ),
         ),
       );
 
-      // stackChildren.add(
-      //   Positioned(
-      //       top: 0.0,
-      //       left: 0.0,
-      //       width: size.width,
-      //       height: size.height,
-      //       child: buildResult()),
-      // );
+      stackChildren.add(
+        Positioned(
+            top: 0.0,
+            left: 0.0,
+            width: size.width,
+            height: size.height,
+            child: buildResult()),
+      );
     }
 
     return Scaffold(
@@ -222,23 +238,23 @@ class ObjectDetectorPainter extends CustomPainter {
         paint,
       );
 
-      // var list = detectedObject.labels;
-      // for (Label label in list) {
-      //   print("${label.text}   ${label.confidence.toStringAsFixed(2)}");
-      //   TextSpan span = TextSpan(
-      //       text: label.text,
-      //       style: const TextStyle(fontSize: 25, color: Colors.blue));
-      //   TextPainter tp = TextPainter(
-      //       text: span,
-      //       textAlign: TextAlign.left,
-      //       textDirection: TextDirection.ltr);
-      //   tp.layout();
-      //   tp.paint(
-      //       canvas,
-      //       Offset(detectedObject.boundingBox.left * scaleX,
-      //           detectedObject.boundingBox.top * scaleY));
-      //   break;
-      // }
+      var list = detectedObject.labels;
+      for (Label label in list) {
+        print("${label.text}   ${label.confidence.toStringAsFixed(2)}");
+        TextSpan span = TextSpan(
+            text: label.text,
+            style: const TextStyle(fontSize: 25, color: Colors.blue));
+        TextPainter tp = TextPainter(
+            text: span,
+            textAlign: TextAlign.left,
+            textDirection: TextDirection.ltr);
+        tp.layout();
+        tp.paint(
+            canvas,
+            Offset(detectedObject.boundingBox.left * scaleX,
+                detectedObject.boundingBox.top * scaleY));
+        break;
+      }
     }
   }
 
